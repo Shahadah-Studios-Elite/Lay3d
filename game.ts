@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // 1. Initialize True 3D WebGL Context
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0f172a); // Premium dark developer theme
+scene.background = new THREE.Color(0x0f172a); 
 scene.fog = new THREE.FogExp2(0x0f172a, 0.04);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -15,23 +15,22 @@ document.body.appendChild(renderer.domElement);
 const lightAmbient = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(lightAmbient);
 
-const lightDirect = new THREE.DirectionalLight(0xf2cd37, 1.2); // Golden Lays Hue
+const lightDirect = new THREE.DirectionalLight(0xf2cd37, 1.2); 
 lightDirect.position.set(5, 15, 7);
 lightDirect.castShadow = true;
 scene.add(lightDirect);
 
 // 3. The 3D Arena Ground (Infinite Matrix Floor Grid)
 const grid3D = new THREE.GridHelper(400, 80, 0xf2cd37, 0x334155);
-grid3D.position.y = -1.6; // Positioned perfectly at human scale drop level
+grid3D.position.y = -1.6; 
 scene.add(grid3D);
 
 // 4. Custom 3D Viewmodel: The Handheld Lays Bag
 const laysBagGroup = new THREE.Group();
 
-// Form the main bag structure (3D Box Geometry with proper mesh depth)
 const bagGeometry = new THREE.BoxGeometry(0.24, 0.36, 0.06);
 const bagMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xc91a09, // Lays Brand Red
+    color: 0xc91a09, 
     roughness: 0.2,
     metalness: 0.1
 });
@@ -39,15 +38,56 @@ const bagMesh = new THREE.Mesh(bagGeometry, bagMaterial);
 bagMesh.castShadow = true;
 laysBagGroup.add(bagMesh);
 
-// Add the 3D Sun Logo Cylinder on top of the bag surface
 const logoGeometry = new THREE.CylinderGeometry(0.07, 0.07, 0.01, 32);
 const logoMaterial = new THREE.MeshStandardMaterial({ color: 0xf2cd37, roughness: 0.4 });
 const logoMesh = new THREE.Mesh(logoGeometry, logoMaterial);
 logoMesh.rotation.x = Math.PI / 2;
-logoMesh.position.set(0, 0, 0.031); // Offset along Z axis to sit flush on the bag face
+logoMesh.position.set(0, 0, 0.031); 
 laysBagGroup.add(logoMesh);
 
 scene.add(laysBagGroup);
+
+// --- AUDIO SETUP ---
+// Put your crunching.mp3 file directly inside your 'public/' folder
+const crunchSound = new Audio('/crunching.mp3');
+
+// --- 3D PARTICLE SYSTEM FOR FLYING CHIPS ---
+interface ChipParticle {
+    mesh: THREE.Mesh;
+    velocity: THREE.Vector3;
+    rotationSpeed: THREE.Vector3;
+    life: number;
+}
+const activeChips: ChipParticle[] = [];
+
+function spawnChipParticle() {
+    // Create a thin golden disc to look like a Lays potato chip
+    const chipGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.005, 8);
+    const chipMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 });
+    const chipMesh = new THREE.Mesh(chipGeo, chipMat);
+
+    // Spawn the chip right out of the top opening of the Lays bag
+    chipMesh.position.copy(laysBagGroup.position);
+    chipMesh.position.y += 0.1; // Shift to top of bag
+
+    // Shoot the chip forward and up into space relative to camera heading
+    const direction = new THREE.Vector3(0, 0.5, -1).applyQuaternion(camera.quaternion).normalize();
+    const speed = 3.0 + Math.random() * 2.0;
+    
+    const velocity = direction.multiplyScalar(speed);
+    // Add a tiny random spread so chips don't all fly in a perfectly straight line
+    velocity.x += (Math.random() - 0.5) * 0.5;
+    velocity.y += (Math.random() - 0.5) * 0.5;
+
+    const rotationSpeed = new THREE.Vector3(
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10
+    );
+
+    scene.add(chipMesh);
+    activeChips.push({ mesh: chipMesh, velocity, rotationSpeed, life: 1.0 });
+}
 
 // 5. 3D Spatial Position Tracking Vectors
 let cameraPosition = new THREE.Vector3(0, 0, 4);
@@ -68,17 +108,24 @@ document.addEventListener('mousemove', (event) => {
 
     rotationYaw -= event.movementX * 0.0025;
     rotationPitch -= event.movementY * 0.0025;
-    rotationPitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, rotationPitch)); // Structural camera ceiling limit
+    rotationPitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, rotationPitch)); 
 });
 
 document.addEventListener('pointerlockchange', () => {
     isPointerLocked = (document.pointerLockElement === document.body);
 });
 
-window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() in activeKeys) activeKeys[e.key.toLowerCase()] = true; });
+// CRITICAL MOUSE UNLOCK CONTROL FIX: Explicitly check for Escape key press
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        document.exitPointerLock();
+        isPointerLocked = false;
+    }
+    if (e.key.toLowerCase() in activeKeys) activeKeys[e.key.toLowerCase()] = true; 
+});
 window.addEventListener('keyup', (e) => { if (e.key.toLowerCase() in activeKeys) activeKeys[e.key.toLowerCase()] = false; });
 
-// 7. Action Event Loop: Crunch Animation Trigger
+// 7. Action Event Loop: Crunch & Particle Animation Trigger
 let totalChipsCrunchCount = 0;
 const counterUiElement = document.getElementById("counter");
 
@@ -87,7 +134,14 @@ window.addEventListener('mousedown', () => {
     totalChipsCrunchCount++;
     if (counterUiElement) counterUiElement.innerText = totalChipsCrunchCount.toString();
 
-    // Kickback animation vector logic (Recoil bounce effect)
+    // Play Handwritten Audio Logic
+    crunchSound.currentTime = 0; // Rewind sound instantly to allow fast spam clicking
+    crunchSound.play().catch(() => {}); // Catch browser block errors if sound isn't ready
+
+    // Shoot 3D Chip out of packet
+    spawnChipParticle();
+
+    // Recoil bounce effect on weapon bag
     laysBagGroup.position.z += 0.06;
     laysBagGroup.rotation.x -= 0.1;
     setTimeout(() => {
@@ -102,6 +156,28 @@ const processClock = new THREE.Clock();
 function engineUpdateLoop() {
     requestAnimationFrame(engineUpdateLoop);
     const timeDelta = processClock.getDelta();
+
+    // Update Flying Chip Particles physics arrays
+    for (let i = activeChips.length - 1; i >= 0; i--) {
+        const chip = activeChips[i];
+        
+        // Apply velocity vectors
+        chip.mesh.position.addScaledVector(chip.velocity, timeDelta);
+        chip.mesh.rotation.x += chip.rotationSpeed.x * timeDelta;
+        chip.mesh.rotation.y += chip.rotationSpeed.y * timeDelta;
+        
+        // Simple gravity pull down over time
+        chip.velocity.y -= 9.8 * timeDelta; 
+        
+        // Decay chip life metric
+        chip.life -= timeDelta * 0.8;
+        
+        // Remove old dead chip entities out of scene tree to prevent memory leaks
+        if (chip.life <= 0 || chip.mesh.position.y < -1.6) {
+            scene.remove(chip.mesh);
+            activeChips.splice(i, 1);
+        }
+    }
 
     // Apply look quaternions directly to camera orientation
     const cameraEulerAngle = new THREE.Euler(rotationPitch, rotationYaw, 0, 'YXZ');
