@@ -1,7 +1,7 @@
 # 🥔 Lay3d: The Absurdly Fun Lays Chip Eating Simulator
 
 > *Born from an absolute dare to make something ridiculous with Three.js*
-> -# Note : Sometime the link may deactivate! every time i come back i activate it
+### ⚠ Note : Sometimes the link may deactivate! every time i come back i activate it
 ## What Even Is This?
 
 Lay3d is a 3D first-person simulator where you do one thing and one thing only: **walk around and eat Lays chips**. That's it. That's the whole game. No plot. No missions. No sense. Just you, a virtual Lays bag, and the satisfying crunch of digital snacking.
